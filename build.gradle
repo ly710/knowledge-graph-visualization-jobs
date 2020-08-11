@@ -1,0 +1,55 @@
+buildscript {
+    repositories {
+        maven { url 'http://maven.aliyun.com/nexus/content/groups/public' }
+        mavenCentral()
+    }
+}
+
+
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'eclipse'
+
+sourceCompatibility = 1.8
+
+group 'org.example'
+version '1.0-SNAPSHOT'
+
+repositories {
+    maven { url 'http://maven.aliyun.com/nexus/content/groups/public' }
+    mavenCentral()
+}
+
+ext {
+    javaVersion = '1.8'
+    flinkVersion = '1.9.0'
+    scalaBinaryVersion = '2.12'
+    slf4jVersion = '1.7.7'
+    log4jVersion = '1.2.17'
+}
+
+jar {
+    archiveBaseName = 'knowledge-graph-visualization-jobs'
+    archiveVersion = '0.0.1'
+    enabled=true
+}
+
+dependencies {
+    compile('org.apache.jena:jena:3.16.0')
+    compile('org.apache.jena:jena-core:3.16.0')
+    compile('org.apache.jena:jena-arq:3.16.0')
+    compile "org.apache.flink:flink-hbase_2.12:${flinkVersion}"
+    compile "org.apache.flink:flink-hadoop-compatibility_2.12:${flinkVersion}"
+    compile "org.apache.flink:flink-table:${flinkVersion}"
+    compile "org.apache.flink:flink-table-api-java-bridge_2.12:${flinkVersion}"
+    compile "org.apache.flink:flink-table-planner-blink_2.12:${flinkVersion}"
+    compile "org.apache.flink:flink-streaming-scala_2.12:${flinkVersion}"
+    compile "org.apache.flink:flink-table-common:${flinkVersion}"
+    compile "org.apache.flink:flink-table-planner_2.12:${flinkVersion}"
+    compile "org.apache.flink:flink-connector-kafka_2.12:${flinkVersion}"
+    compile "org.apache.flink:flink-connector-kafka-0.10_2.12:${flinkVersion}"
+    compile "org.apache.flink:flink-java:${flinkVersion}"
+    compile "org.apache.flink:flink-clients_2.12:${flinkVersion}"
+//    compile "log4j:log4j:1.2.17"
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
