@@ -1,4 +1,4 @@
-package knowledge.graph.visualization.util;
+package knowledge.graph.visualization.jobs.util;
 
 public class Edge {
     public Long sourceId;

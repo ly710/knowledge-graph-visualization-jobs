@@ -1,7 +1,7 @@
 package knowledge.graph.visualization.jobs;
 
-import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.functions.*;
+import org.apache.flink.api.common.io.OutputFormat;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
@@ -9,6 +9,7 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.api.java.tuple.Tuple5;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 
 import java.io.*;
@@ -16,12 +17,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class GraphPartitioner {
-    public static void main(String[] args) throws Exception {
-//    public void partition(String path) {
-        final ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+    private final ExecutionEnvironment env;
 
+    private final String datasetName;
+
+    public GraphPartitioner(ExecutionEnvironment env, String datasetName) {
+        this.env = env;
+        this.datasetName = datasetName;
+    }
+
+    public void partition() throws Exception {
         DataSet<Tuple3<Long, Double, Double>> nodesWithPosition = env
-                .readTextFile("/tmp/flink/output/yago.layout.nodes.tsv")
+                .readTextFile(Dir.BASE_DIR + datasetName + "/layout.vertexes.tsv")
                 .map(new MapFunction<String, Tuple3<Long, Double, Double>>() {
                     @Override
                     public Tuple3<Long, Double, Double> map(String value) throws Exception {
@@ -45,7 +52,7 @@ public class GraphPartitioner {
                 });
 
         DataSet<Tuple2<Long, Long>> edges = env
-                .readTextFile("/tmp/flink/output/yago-id-facts.tsv")
+                .readTextFile(Dir.BASE_DIR + datasetName + "/graph.tsv")
                 .map(new MapFunction<String, Tuple2<Long, Long>>() {
                     @Override
                     public Tuple2<Long, Long> map(String value) throws Exception {
@@ -87,13 +94,7 @@ public class GraphPartitioner {
                 .setParallelism(1)
                 .sortPartition(2, Order.ASCENDING)
                 .setParallelism(1)
-                .map(new MapFunction<Tuple5<Long, Integer, Integer, Double, Double>, String>() {
-                    @Override
-                    public String map(Tuple5<Long, Integer, Integer, Double, Double> value) throws Exception {
-                        return value.f0 + "\t" + value.f1 + "\t" + value.f2 + "\t" + value.f3 + "\t" + value.f4;
-                    }
-                })
-                .writeAsText("/tmp/flink/output/yago-nodes-block/yago-nodes-block.tsv")
+                .output(new VertexPartitionSink(Dir.BASE_DIR + datasetName + "/vertexes-block/"))
                 .setParallelism(1);
 
         edgesWithBlock
@@ -101,86 +102,10 @@ public class GraphPartitioner {
                 .setParallelism(1)
                 .sortPartition(1, Order.ASCENDING)
                 .setParallelism(1)
-                .map(new MapFunction<Tuple4<Integer, Integer, Long, Long>, String>() {
-                    @Override
-                    public String map(Tuple4<Integer, Integer, Long, Long> value) throws Exception {
-                        return value.f0 + "\t" + value.f1 + "\t" + value.f2 + "\t" + value.f3;
-                    }
-                })
-                .writeAsText("/tmp/flink/output/yago-edges-block/yago-edges-block.tsv")
+                .output(new EdgePartitionSink(Dir.BASE_DIR + datasetName + "/edges-block/"))
                 .setParallelism(1);
 
-        JobExecutionResult jobExecutionResult = env.execute("partition");
-        jobExecutionResult.getNetRuntime();
-
-        FileReader nodeFr = new FileReader("/tmp/flink/output/yago-nodes-block/yago-nodes-block.tsv");
-        FileReader edgeFr = new FileReader("/tmp/flink/output/yago-edges-block/yago-edges-block.tsv");
-        BufferedReader nodeBf = new BufferedReader(nodeFr);
-        BufferedReader edgeBf = new BufferedReader(edgeFr);
-
-        String str;
-        String title = "";
-        String newTitle;
-        List<String> records = new ArrayList<>();
-        // 按行读取字符串
-        while ((str = nodeBf.readLine()) != null) {
-            String[] split = str.split("\t");
-            newTitle = split[1] + "-" + split[2];
-            if(!title.equals(newTitle)) {
-                if(records.size() > 0) {
-                    File fileOut = new File("/tmp/flink/output/yago-nodes-block/" + title + ".tsv");
-
-                    FileOutputStream fileOutputStream = new FileOutputStream(fileOut);
-                    BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileOutputStream));
-
-                    for (String r : records) {
-                        bufferedWriter.write(r);
-                        bufferedWriter.newLine();
-                    }
-
-                    bufferedWriter.close();
-                    fileOutputStream.close();
-                    records.clear();
-                } else {
-                    records.add(split[0] + "\t" + split[3] + "\t" + split[4]);
-                }
-                title = newTitle;
-            } else {
-                records.add(split[0] + "\t" + split[3] + "\t" + split[4]);
-            }
-        }
-
-        while ((str = edgeBf.readLine()) != null) {
-            String[] split = str.split("\t");
-            newTitle = split[0] + "-" + split[1];
-            if(!title.equals(newTitle)) {
-                if(records.size() > 0) {
-                    File fileOut = new File("/tmp/flink/output/yago-edges-block/" + title + ".tsv");
-
-                    FileOutputStream fileOutputStream = new FileOutputStream(fileOut);
-                    BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileOutputStream));
-
-                    for (String r : records) {
-                        bufferedWriter.write(r);
-                        bufferedWriter.newLine();
-                    }
-
-                    bufferedWriter.close();
-                    fileOutputStream.close();
-                    records.clear();
-                } else {
-                    records.add(split[2] + "\t" + split[3]);
-                }
-                title = newTitle;
-            } else {
-                records.add(split[2] + "\t" + split[3]);
-            }
-        }
-
-        nodeBf.close();
-        nodeFr.close();
-        edgeBf.close();
-        edgeFr.close();
+        env.execute("partition");
     }
 
     public static Block getBlock(double x, double y) {
@@ -203,21 +128,141 @@ public class GraphPartitioner {
             this.x = x;
             this.y = y;
         }
+    }
 
-        public Integer getX() {
-            return x;
+    public static class VertexPartitionSink implements OutputFormat<Tuple5<Long, Integer, Integer, Double, Double>> {
+        private String path;
+
+        private FileOutputStream fileWriter;
+
+        private BufferedWriter bufferedWriter;
+
+        private String currentPartition;
+
+        private List<Tuple5<Long, Integer, Integer, Double, Double>> currentPartitionRecords = new ArrayList<>();
+
+        public VertexPartitionSink(String path) {
+            this.path = path;
         }
 
-        public void setX(Integer x) {
-            this.x = x;
+        @Override
+        public void configure(Configuration parameters) {
+            //.
         }
 
-        public Integer getY() {
-            return y;
+        @Override
+        public void open(int taskNumber, int numTasks) throws IOException {
+            //..
         }
 
-        public void setY(Integer y) {
-            this.y = y;
+        @Override
+        public void writeRecord(Tuple5<Long, Integer, Integer, Double, Double> record) throws IOException {
+            String partition = record.f1 + "-" + record.f2;
+
+            if(fileWriter == null) {
+                fileWriter = new FileOutputStream(path + partition + ".tsv");
+                bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileWriter));
+                currentPartitionRecords.add(record);
+                currentPartition = partition;
+                return;
+            }
+
+            if(!partition.equals(currentPartition)) {
+                for (Tuple5<Long, Integer, Integer, Double, Double> r : currentPartitionRecords) {
+                    bufferedWriter.write(r.f0 + "\t" + r.f3 + "\t" + r.f4);
+                    bufferedWriter.newLine();
+                }
+
+                bufferedWriter.close();
+                fileWriter.close();
+
+                currentPartitionRecords.clear();
+
+                currentPartition = partition;
+                fileWriter = new FileOutputStream(path + currentPartition + ".tsv");
+                bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileWriter));
+            }
+
+            currentPartitionRecords.add(record);
+        }
+
+        @Override
+        public void close() throws IOException {
+            for (Tuple5<Long, Integer, Integer, Double, Double> r : currentPartitionRecords) {
+                bufferedWriter.write(r.f0 + "\t" + r.f3 + "\t" + r.f4);
+                bufferedWriter.newLine();
+            }
+
+            bufferedWriter.close();
+            fileWriter.close();
+        }
+    }
+
+    public static class EdgePartitionSink implements OutputFormat<Tuple4<Integer, Integer, Long, Long>> {
+        private String path;
+
+        private FileOutputStream fileWriter;
+
+        private BufferedWriter bufferedWriter;
+
+        private String currentPartition;
+
+        private List<Tuple4<Integer, Integer, Long, Long>> currentPartitionRecords = new ArrayList<>();
+
+        public EdgePartitionSink(String path) {
+            this.path = path;
+        }
+
+        @Override
+        public void configure(Configuration parameters) {
+            //.
+        }
+
+        @Override
+        public void open(int taskNumber, int numTasks) throws IOException {
+            //..
+        }
+
+        @Override
+        public void writeRecord(Tuple4<Integer, Integer, Long, Long> record) throws IOException {
+            String partition = record.f0 + "-" + record.f1;
+
+            if(fileWriter == null) {
+                fileWriter = new FileOutputStream(path + partition + ".tsv");
+                bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileWriter));
+                currentPartitionRecords.add(record);
+                currentPartition = partition;
+                return;
+            }
+
+            if(!partition.equals(currentPartition)) {
+                for (Tuple4<Integer, Integer, Long, Long> r : currentPartitionRecords) {
+                    bufferedWriter.write(r.f2 + "\t" + r.f3);
+                    bufferedWriter.newLine();
+                }
+
+                bufferedWriter.close();
+                fileWriter.close();
+
+                currentPartitionRecords.clear();
+
+                currentPartition = partition;
+                fileWriter = new FileOutputStream(path + currentPartition + ".tsv");
+                bufferedWriter = new BufferedWriter(new OutputStreamWriter(fileWriter));
+            }
+
+            currentPartitionRecords.add(record);
+        }
+
+        @Override
+        public void close() throws IOException {
+            for (Tuple4<Integer, Integer, Long, Long> r : currentPartitionRecords) {
+                bufferedWriter.write(r.f2 + "\t" + r.f3);
+                bufferedWriter.newLine();
+            }
+
+            bufferedWriter.close();
+            fileWriter.close();
         }
     }
 }

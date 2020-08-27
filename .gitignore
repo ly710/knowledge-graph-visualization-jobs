@@ -9,6 +9,8 @@ application.properties
 bootstrap.properties
 log/
 gradle.properties
+.DS_Store/
+input/.DS_Store/
 
 ### STS ###
 .apt_generated

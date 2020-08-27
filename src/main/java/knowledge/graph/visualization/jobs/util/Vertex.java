@@ -1,6 +1,6 @@
 package knowledge.graph.visualization.jobs.util;
 
-public class Node {
+public class Vertex {
     public Long id;
 
     public Double x;
@@ -11,7 +11,7 @@ public class Node {
 
     public Integer size = 12;
 
-    public Node(Long id, String name, Double x, Double y) {
+    public Vertex(Long id, String name, Double x, Double y) {
         this.id = id;
         this.name = name;
         this.x = x;

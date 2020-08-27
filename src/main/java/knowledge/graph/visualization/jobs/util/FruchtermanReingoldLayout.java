@@ -1,4 +1,4 @@
-package knowledge.graph.visualization.util;
+package knowledge.graph.visualization.jobs.util;
 
 import java.util.HashMap;
 import java.util.List;
@@ -6,11 +6,11 @@ import java.util.Map;
 import java.util.Random;
 
 public class FruchtermanReingoldLayout {
-    private int w; // 画布的宽度
-    private int l; //画布的⻓长度
-    private int temperature = w / 10; //模拟退火火初始温度
+    private long w; // 画布的宽度
+    private long l; //画布的⻓长度
+    private long temperature = w / 10; //模拟退火火初始温度
     private int maxIter = 1000; //算法迭代次数
-    private int area; //布局大大小小
+    private long area; //布局大大小小
     private double c = 1; // 节点距离控制系数
 
     /**
@@ -20,7 +20,7 @@ public class FruchtermanReingoldLayout {
      * @param maxIter the max iterator of the arig
      * @param rate define the initial value of temperature
      */
-    public FruchtermanReingoldLayout(int w, int l, int maxIter, int rate, double c) {
+    public FruchtermanReingoldLayout(long w, long l, int maxIter, int rate, double c) {
         this.w = w;
         this.l = l;
         this.maxIter = maxIter;
@@ -29,15 +29,15 @@ public class FruchtermanReingoldLayout {
         this.area = w * l;
     }
 
-    public List<Node> run(List<Node> nodes, List<Edge> edges) {
-        List<Node> reSetNodes = nodes;
+    public List<Vertex> run(List<Vertex> nodes, List<Edge> edges) {
+        List<Vertex> reSetNodes = nodes;
         for (int i = 0; i < maxIter; i++) {
             reSetNodes = springLayout(reSetNodes, edges, i);
         }
         return reSetNodes;
     }
 
-    public List<Node> springLayout(List<Node> nodes, List<Edge> edges, int curIter) {
+    public List<Vertex> springLayout(List<Vertex> nodes, List<Edge> edges, int curIter) {
         //2计算每次迭代局部区域内两两节点间的斥力力力所产生生的单位位移(一一般为正值)
         double deltaX, deltaY, deltaLength;
         //节点之间的距离
@@ -51,17 +51,15 @@ public class FruchtermanReingoldLayout {
             dispY.put(nodes.get(v).getId(), 0.0);
             for (int u = 0; u < nodes.size(); u++) {
                 if (u != v) {
-                    Node nodeV = nodes.get(v);
-                    Node nodeU = nodes.get(u);
+                    Vertex nodeV = nodes.get(v);
+                    Vertex nodeU = nodes.get(u);
                     deltaX = nodeV.getX() - nodeU.getX();
 
                     if (Double.isNaN(deltaX)) {
-                        System.out.println("x error" + nodes.get(v).getX());
                     }
                     deltaY = nodeV.getY() - nodeU.getY();
 
                     if (Double.isNaN(deltaY)) {
-                        System.out.println("y error" + nodes.get(v).getX());
                     }
                     deltaLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY) - (nodeV.getSize() + nodeU.getSize());
 
@@ -78,7 +76,7 @@ public class FruchtermanReingoldLayout {
         }
 
         //3. 计算每次迭代每条边的引力力力对两端节点所产生生的单位位移(一一般为负值)
-        Node visnodeS = null, visnodeE = null;
+        Vertex visnodeS = null, visnodeE = null;
         for (int e = 0; e < edges.size(); e++) {
             Long eStartID = edges.get(e).getSourceId();
             Long eEndID = edges.get(e).getEndId();
@@ -113,7 +111,7 @@ public class FruchtermanReingoldLayout {
 
         //set x,y
         for (int v = 0; v < nodes.size(); v++) {
-            Node node = nodes.get(v);
+            Vertex node = nodes.get(v);
             Double dx = dispX.get(node.getId());
             Double dy = dispY.get(node.getId());
             Double dispLength = Math.sqrt(dx * dx + dy * dy);
@@ -138,8 +136,8 @@ public class FruchtermanReingoldLayout {
         temperature *= (1.0 - curIter / (double) maxIter);
     }
 
-    private Node getNodeById(List<Node> nodes, Long id) {
-        for (Node node : nodes) {
+    private Vertex getNodeById(List<Vertex> nodes, Long id) {
+        for (Vertex node : nodes) {
             if (node.getId().equals(id)) {
                 return node;
             }
