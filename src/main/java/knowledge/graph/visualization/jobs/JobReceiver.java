@@ -1,6 +1,6 @@
 package knowledge.graph.visualization.jobs;
 
-import org.apache.flink.api.java.ExecutionEnvironment;
+        import org.apache.flink.api.java.ExecutionEnvironment;
 
 public class JobReceiver {
     public static void main(String[] args) throws Exception {
@@ -14,16 +14,12 @@ public class JobReceiver {
                 Tuples2Graph tuples2Graph = new Tuples2Graph(env, datasetName);
                 tuples2Graph.sink();
                 break;
-            case "partition-graph":
-                GraphPartitioner graphPartitioner = new GraphPartitioner(env, datasetName);
-                graphPartitioner.partition();
-                break;
             case "layout":
                 Layout layout = new Layout(env, datasetName);
                 layout.layout();
                 break;
         }
 
-        env.execute("job");
+        env.execute("job").getJobExecutionResult();
     }
 }
