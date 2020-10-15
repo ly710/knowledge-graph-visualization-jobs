@@ -1,4 +1,4 @@
-package knowledge.graph.visualization.jobs;
+package knowledge.graph.visualization.jobs.util;
 
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.io.OutputFormat;
