@@ -2,8 +2,10 @@ package knowledge.graph.visualization.jobs.config;
 
 import lombok.Data;
 
+import java.io.Serializable;
+
 @Data
-public class MysqlConfig
+public class MysqlConfig implements Serializable
 {
     private String connectionString;
 

@@ -1,10 +1,15 @@
 package knowledge.graph.visualization.jobs.util;
 
+import knowledge.graph.visualization.jobs.config.MysqlConfig;
 import org.apache.flink.api.common.functions.*;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.operators.IterativeDataSet;
 import org.apache.flink.api.java.tuple.*;
 import org.apache.flink.util.Collector;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.Random;
 
 public class FruchtermanReingoldLayout {
@@ -16,18 +21,26 @@ public class FruchtermanReingoldLayout {
 
     private final DataSet<Tuple2<Long, Long>> edges;
 
+    private final MysqlConfig mysqlConfig;
+
+    private final String datasetName;
+
     private Long length;
 
     public FruchtermanReingoldLayout(
             int rate,
             double coefficient,
             DataSet<Tuple3<Long, String, Double>> vertexes,
-            DataSet<Tuple2<Long, Long>> edges
+            DataSet<Tuple2<Long, Long>> edges,
+            MysqlConfig mysqlConfig,
+            String datasetName
     ) {
         this.coefficient = coefficient;
         this.rate = rate;
         this.vertexes = vertexes;
         this.edges = edges;
+        this.mysqlConfig = mysqlConfig;
+        this.datasetName = datasetName;
     }
 
     public FruchtermanReingoldLayout(
@@ -35,22 +48,32 @@ public class FruchtermanReingoldLayout {
             double coefficient,
             DataSet<Tuple3<Long, String, Double>> vertexes,
             DataSet<Tuple2<Long, Long>> edges,
-            long length
+            long length,
+            MysqlConfig mysqlConfig,
+            String datasetName
     ) {
         this.coefficient = coefficient;
         this.rate = rate;
         this.vertexes = vertexes;
         this.edges = edges;
         this.length = length;
+        this.mysqlConfig = mysqlConfig;
+        this.datasetName = datasetName;
     }
 
     public DataSet<Tuple2<Tuple5<Long, String, Double, Double, Double>, Tuple5<Long, String, Double, Double, Double>>> run() throws Exception {
         long vertexNum = vertexes.count();
         if(length == null) {
             length = ((long) Math.ceil((double) vertexNum / 1000) + 1) * 1000 * 2;
+            Connection connection = DriverManager.getConnection(mysqlConfig.getConnectionString(), mysqlConfig.getUsername(), mysqlConfig.getPassword());
+            String sql = "INSERT INTO `meta` (`dataset`, `width`, `height`) VALUES ('" + datasetName + "', " + length + ", " + length + ")";
+            Statement statement = connection.createStatement();
+            statement.executeUpdate(sql);
+            statement.close();
+            connection.close();
         }
 
-        int maxIter = (int)(10 * Math.log(vertexNum));
+        int maxIter = (int)(100 * Math.log(vertexNum));
 
         DataSet<Tuple5<Long, String, Double, Double, Double>> vertexesWithRandomPosition = vertexes
                 .map(new SetRandomPositionMapFunction(length, length));
@@ -167,7 +190,7 @@ public class FruchtermanReingoldLayout {
         public Tuple3<Long, Double, Double> map(Tuple2<Tuple6<Long, String, Double, Double, Double, Integer>, Tuple6<Long, String, Double, Double, Double, Integer>> value) throws Exception {
             double deltaX = value.f0.f3 - value.f1.f3;
             double deltaY = value.f0.f4 - value.f1.f4;
-            double deltaLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY) - (value.f0.f2 + value.f1.f2);
+            double deltaLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY) - 2 * (value.f0.f2 + value.f1.f2);
             double force = k * k / deltaLength;
 
             return new Tuple3<>(value.f0.f0, (deltaX / deltaLength) * force, (deltaY / deltaLength) * force);
@@ -185,7 +208,7 @@ public class FruchtermanReingoldLayout {
         public void flatMap(Tuple2<Tuple6<Long, String, Double, Double, Double, Integer>, Tuple6<Long, String, Double, Double, Double, Integer>> value, Collector<Tuple3<Long, Double, Double>> out) throws Exception {
             double deltaX = value.f0.f3 - value.f1.f3;
             double deltaY = value.f0.f4 - value.f1.f4;
-            double deltaLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY) - (value.f0.f2 + value.f1.f2);
+            double deltaLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY) - 2 * (value.f0.f2 + value.f1.f2);
             double force = deltaLength * deltaLength / k;
 
             double xDisplacement = (deltaX / deltaLength) * force;
