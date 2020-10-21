@@ -73,7 +73,7 @@ public class FruchtermanReingoldLayout {
             connection.close();
         }
 
-        int maxIter = (int)(100 * Math.log(vertexNum));
+        int maxIter = (int)(5 * 100 * Math.log(vertexNum));
 
         DataSet<Tuple5<Long, String, Double, Double, Double>> vertexesWithRandomPosition = vertexes
                 .map(new SetRandomPositionMapFunction(length, length));

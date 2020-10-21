@@ -4,6 +4,7 @@ import knowledge.graph.visualization.jobs.config.MysqlConfig;
 import knowledge.graph.visualization.jobs.util.PageRanker;
 import knowledge.graph.visualization.jobs.util.FruchtermanReingoldLayout;
 import knowledge.graph.visualization.jobs.util.Tuples2FlinkGraph;
+import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.JoinFunction;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -23,10 +24,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Layout {
     private final ExecutionEnvironment env;
@@ -50,6 +50,17 @@ public class Layout {
     }
 
     public void run() throws Exception {
+        List<String> predictsToFilter = new ArrayList<>();
+        Class.forName("com.mysql.jdbc.Driver");
+        Connection connection = DriverManager.getConnection(mysqlConfig.getConnectionString(), mysqlConfig.getUsername(), mysqlConfig.getPassword());
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery("SELECT `name` FROM predict WHERE dataset = '" + dataset + "' AND keep = 0");
+        while (resultSet.next()) {
+            predictsToFilter.add(resultSet.getString("name"));
+        }
+        statement.close();
+        connection.close();
+
         DataSet<Tuple3<String, String, String>> tuples = env
                 .readTextFile(tupleFilePath + "/" + dataset + ".tuples.tsv")
                 .map(new MapFunction<String, Tuple3<String, String, String>>() {
@@ -59,7 +70,8 @@ public class Layout {
 
                         return new Tuple3<>(splits[0], splits[1], splits[2]);
                     }
-                });
+                })
+                .filter(new FilterPredicts(predictsToFilter));
 
         DataSet<Tuple1<String>> entities = tuples
                 .flatMap(new FlatMapFunction<Tuple3<String, String, String>, Tuple1<String>>() {
@@ -173,6 +185,19 @@ public class Layout {
                 .run()
                 .output(new MysqlSink(dataset, mysqlConfig))
                 .setParallelism(1);
+    }
+
+    public static class FilterPredicts implements FilterFunction<Tuple3<String, String, String>> {
+        private final List<String> predicts;
+
+        public FilterPredicts(List<String> predicts) {
+            this.predicts = predicts;
+        }
+
+        @Override
+        public boolean filter(Tuple3<String, String, String> value) throws Exception {
+            return !predicts.contains(value.f1);
+        }
     }
 
     public static class MysqlSink implements OutputFormat<Tuple2<Tuple5<Long, String, Double, Double, Double>, Tuple5<Long, String, Double, Double, Double>>>, Serializable {
