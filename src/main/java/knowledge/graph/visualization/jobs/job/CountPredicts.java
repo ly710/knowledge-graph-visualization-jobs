@@ -42,7 +42,7 @@ public class CountPredicts {
 
     public void run() throws Exception {
         DataSet<Tuple3<String, String, String>> tuples = env
-                .readTextFile(tupleFilePath + "/" + dataset + ".tuples.tsv")
+                .readTextFile(tupleFilePath)
                 .map(new MapFunction<String, Tuple3<String, String, String>>() {
                     @Override
                     public Tuple3<String, String, String> map(String value) throws Exception {
